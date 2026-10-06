@@ -1,0 +1,383 @@
+/* ============================================================
+   QR Geçiş Sistemi — Stil Dosyası
+   Renk sistemi: lacivert-gri zemin, cyan/teal vurgu
+   ============================================================ */
+
+:root {
+    /* Renk paleti */
+    --bg-deep:    #0f172a;
+    --bg-card:    #1e293b;
+    --bg-surface: #334155;
+    --accent:     #22d3ee;       /* Cyan 400 */
+    --accent-dim: #0891b2;       /* Cyan 600 */
+    --text-hi:    #f1f5f9;
+    --text-mid:   #94a3b8;
+    --text-lo:    #475569;
+    --danger:     #f87171;
+    --success:    #4ade80;
+    --border:     rgba(148,163,184,0.15);
+
+    /* Tipografi */
+    --font-ui:   'Inter', system-ui, -apple-system, sans-serif;
+    --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+    /* Boyut & boşluk */
+    --radius-sm: 8px;
+    --radius-md: 16px;
+    --radius-lg: 24px;
+    --safe-top:    env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* ── Reset & temel ─────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+    height: 100%;
+    background: var(--bg-deep);
+    color: var(--text-hi);
+    font-family: var(--font-ui);
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+}
+
+/* Güvenli alan üst boşluğu */
+body {
+    padding-top: var(--safe-top);
+    padding-bottom: var(--safe-bottom);
+}
+
+/* Google Fonts yükleme */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap');
+
+/* ── Ekran yönetimi ────────────────────────────────────── */
+.screen {
+    position: fixed; inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+.screen.active {
+    opacity: 1;
+    pointer-events: all;
+}
+
+/* ============================================================
+   GİRİŞ EKRANI
+   ============================================================ */
+.login-card {
+    width: min(420px, calc(100vw - 32px));
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 36px 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.logo {
+    width: 52px; height: 52px;
+    background: linear-gradient(135deg, var(--accent-dim), var(--accent));
+    border-radius: 14px;
+    display: grid; place-items: center;
+    color: var(--bg-deep);
+}
+.logo svg { width: 28px; height: 28px; }
+
+.login-card h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-hi);
+    margin-top: 4px;
+}
+
+.subtitle {
+    font-size: 0.9rem;
+    color: var(--text-mid);
+    margin-top: -8px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-mid);
+    letter-spacing: 0.03em;
+}
+
+input {
+    background: var(--bg-deep);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 11px 14px;
+    color: var(--text-hi);
+    font-size: 0.95rem;
+    font-family: var(--font-ui);
+    outline: none;
+    transition: border-color 0.2s;
+    width: 100%;
+}
+
+input:focus { border-color: var(--accent); }
+input::placeholder { color: var(--text-lo); }
+
+.btn-primary {
+    background: var(--accent);
+    color: var(--bg-deep);
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: 13px 24px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    font-family: var(--font-ui);
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+    margin-top: 4px;
+}
+
+.btn-primary:hover  { background: var(--accent-dim); color: var(--text-hi); }
+.btn-primary:active { transform: scale(0.98); }
+.btn-primary:disabled {
+    background: var(--bg-surface);
+    color: var(--text-lo);
+    cursor: not-allowed;
+}
+
+.error-msg {
+    font-size: 0.85rem;
+    color: var(--danger);
+    text-align: center;
+}
+
+.hint {
+    font-size: 0.78rem;
+    color: var(--text-lo);
+    text-align: center;
+}
+
+.hidden { display: none !important; }
+
+/* ============================================================
+   QR EKRANI
+   ============================================================ */
+#screen-qr {
+    padding: 0;
+    background: var(--bg-deep);
+}
+
+.app-header {
+    position: fixed;
+    top: var(--safe-top);
+    left: 0; right: 0;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    background: rgba(15,23,42,0.85);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    z-index: 10;
+}
+
+.user-name {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-hi);
+}
+
+.btn-logout {
+    background: transparent;
+    border: none;
+    color: var(--text-mid);
+    cursor: pointer;
+    width: 36px; height: 36px;
+    display: grid; place-items: center;
+    border-radius: 8px;
+    transition: background 0.2s, color 0.2s;
+}
+.btn-logout:hover { background: var(--bg-surface); color: var(--text-hi); }
+.btn-logout svg { width: 20px; height: 20px; }
+
+.qr-main {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 28px;
+    width: 100%;
+    height: 100%;
+    padding: 80px 24px 60px;
+}
+
+/* QR Kod çerçevesi */
+.qr-wrapper {
+    position: relative;
+    padding: 20px;
+    background: #ffffff;
+    border-radius: var(--radius-md);
+    box-shadow: 0 0 60px rgba(34,211,238,0.15), 0 0 120px rgba(34,211,238,0.06);
+}
+
+/* Köşe süslemeleri */
+.qr-corner {
+    position: absolute;
+    width: 20px; height: 20px;
+    border-color: var(--accent);
+    border-style: solid;
+}
+.qr-corner.tl { top: -3px; left: -3px;  border-width: 3px 0 0 3px; border-radius: 4px 0 0 0; }
+.qr-corner.tr { top: -3px; right: -3px; border-width: 3px 3px 0 0; border-radius: 0 4px 0 0; }
+.qr-corner.bl { bottom: -3px; left: -3px;  border-width: 0 0 3px 3px; border-radius: 0 0 0 4px; }
+.qr-corner.br { bottom: -3px; right: -3px; border-width: 0 3px 3px 0; border-radius: 0 0 4px 0; }
+
+#qr-container canvas, #qr-container img {
+    display: block;
+    width: 220px !important;
+    height: 220px !important;
+}
+
+/* Zamanlayıcı bölümü */
+.timer-section {
+    width: min(320px, 100%);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: center;
+}
+
+.timer-label {
+    font-size: 0.88rem;
+    color: var(--text-mid);
+    text-align: center;
+}
+.timer-label strong {
+    color: var(--accent);
+    font-family: var(--font-mono);
+    font-size: 1rem;
+}
+
+.progress-bar-track {
+    width: 100%;
+    height: 4px;
+    background: var(--bg-surface);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-dim), var(--accent));
+    border-radius: 2px;
+    transition: width 1s linear;
+}
+
+/* Bilgi şeridi */
+.info-strip {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 14px 24px;
+    width: min(320px, 100%);
+}
+
+.info-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    flex: 1;
+}
+
+.info-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-lo);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.info-value {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--text-hi);
+}
+
+.mono { font-family: var(--font-mono); letter-spacing: 0.15em; }
+
+.info-divider {
+    width: 1px; height: 40px;
+    background: var(--border);
+}
+
+/* Durum rozeti */
+.badge {
+    font-size: 0.78rem;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 20px;
+}
+.badge-ok      { background: rgba(74,222,128,0.15); color: var(--success); }
+.badge-warning { background: rgba(251,191, 36,0.15); color: #fbbf24; }
+.badge-error   { background: rgba(248,113,113,0.15); color: var(--danger); }
+
+/* Alt bilgi */
+.app-footer {
+    position: fixed;
+    bottom: var(--safe-bottom);
+    left: 0; right: 0;
+    display: flex;
+    justify-content: center;
+    padding: 12px;
+}
+
+.offline-badge {
+    font-size: 0.78rem;
+    color: #fbbf24;
+    background: rgba(251,191,36,0.1);
+    border: 1px solid rgba(251,191,36,0.3);
+    padding: 4px 12px;
+    border-radius: 20px;
+}
+
+/* ── Yükleniyor animasyonu ──────────────────────────────── */
+.btn-primary.loading span::after {
+    content: '';
+    display: inline-block;
+    width: 12px; height: 12px;
+    border: 2px solid currentColor;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    margin-left: 8px;
+    vertical-align: middle;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Responsive ────────────────────────────────────────── */
+@media (max-width: 360px) {
+    #qr-container canvas, #qr-container img {
+        width: 180px !important;
+        height: 180px !important;
+    }
+    .login-card { padding: 28px 20px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+}

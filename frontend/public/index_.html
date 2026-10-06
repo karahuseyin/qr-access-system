@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0f172a">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="QR Geçiş">
+    <title>QR Geçiş Sistemi</title>
+
+    <!--
+    ╔══════════════════════════════════════════════════════════╗
+    ║  QR KOD Tabanlı Geçiş Kontrol Sistemi — PWA             ║
+    ║  Tek dosya, offline çalışır, kurulum gerektirmez         ║
+    ╚══════════════════════════════════════════════════════════╝
+
+    KULLANIM:
+      1. Bu dosyayı C:\HKH\projeler\qr-access-system\frontend\public\ içine koyun
+      2. Tarayıcıda doğrudan açın VEYA:
+         - VSCode Live Server ile açın (sağ tık → Open with Live Server)
+         - VEYA: python -m http.server 8080  (bu klasörün içinden çalıştırın)
+      3. "Ad Soyad", "E-posta", "Sunucu Adresi" (http://localhost:3000) doldurun
+      4. "Cihazı Kaydet" tıklayın
+    -->
+
+    <style>
+/* ============================================================
+   Renk sistemi: lacivert zemin, cyan vurgu
+   ============================================================ */
+:root {
+    --bg-deep:    #0f172a;
+    --bg-card:    #1e293b;
+    --bg-surface: #334155;
+    --accent:     #22d3ee;
+    --accent-dim: #0891b2;
+    --text-hi:    #f1f5f9;
+    --text-mid:   #94a3b8;
+    --text-lo:    #475569;
+    --danger:     #f87171;
+    --success:    #4ade80;
+    --border:     rgba(148,163,184,0.15);
+    --radius-sm: 8px;
+    --radius-md: 16px;
+    --radius-lg: 24px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+    height: 100%;
+    background: var(--bg-deep);
+    color: var(--text-hi);
+    font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+}
+
+/* ── Ekran yönetimi ──────────────────────────── */
+.screen {
+    position: fixed; inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+    overflow-y: auto;
+    padding: 20px;
+}
+.screen.active { opacity: 1; pointer-events: all; }
+
+/* ── GİRİŞ EKRANI ────────────────────────────── */
+.login-card {
+    width: min(420px, 100%);
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 36px 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.logo {
+    width: 52px; height: 52px;
+    background: linear-gradient(135deg, var(--accent-dim), var(--accent));
+    border-radius: 14px;
+    display: grid; place-items: center;
+    color: var(--bg-deep);
+    font-size: 24px;
+}
+
+.login-card h1 { font-size: 1.5rem; font-weight: 700; }
+.subtitle { font-size: 0.88rem; color: var(--text-mid); margin-top: -6px; }
+
+.form-group { display: flex; flex-direction: column; gap: 6px; }
+label { font-size: 0.78rem; font-weight: 600; color: var(--text-mid); letter-spacing: 0.04em; }
+
+input {
+    background: var(--bg-deep);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 11px 14px;
+    color: var(--text-hi);
+    font-size: 0.95rem;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.2s;
+    width: 100%;
+}
+input:focus { border-color: var(--accent); }
+input::placeholder { color: var(--text-lo); }
+
+.btn-primary {
+    background: var(--accent);
+    color: var(--bg-deep);
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: 13px 24px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+    margin-top: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+.btn-primary:hover  { background: var(--accent-dim); color: var(--text-hi); }
+.btn-primary:active { transform: scale(0.98); }
+.btn-primary:disabled { background: var(--bg-surface); color: var(--text-lo); cursor: not-allowed; }
+
+.spinner {
+    width: 16px; height: 16px;
+    border: 2px solid currentColor;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    display: none;
+}
+.loading .spinner { display: block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.error-msg { font-size: 0.85rem; color: var(--danger); text-align: center; background: rgba(248,113,113,0.1); border: 1px solid rgba(248,113,113,0.3); border-radius: 6px; padding: 8px 12px; }
+.hint { font-size: 0.78rem; color: var(--text-lo); text-align: center; }
+.hidden { display: none !important; }
+
+/* ── QR EKRANI ──────────────────────────────── */
+#screen-qr {
+    background: var(--bg-deep);
+    padding: 0;
+    overflow: hidden;
+}
+
+.app-header {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    background: rgba(15,23,42,0.9);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    z-index: 10;
+}
+
+.user-name { font-size: 0.95rem; font-weight: 600; }
+
+.btn-logout {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-mid);
+    cursor: pointer;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-family: inherit;
+    transition: background 0.2s, color 0.2s;
+}
+.btn-logout:hover { background: var(--bg-surface); color: var(--text-hi); }
+
+.qr-main {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 28px;
+    width: 100%;
+    height: 100vh;
+    padding: 76px 24px 40px;
+}
+
+/* QR çerçeve */
+.qr-wrapper {
+    position: relative;
+    padding: 16px;
+    background: #ffffff;
+    border-radius: var(--radius-md);
+    box-shadow: 0 0 60px rgba(34,211,238,0.2);
+}
+
+.qr-corner {
+    position: absolute;
+    width: 22px; height: 22px;
+    border-color: var(--accent);
+    border-style: solid;
+}
+.qr-corner.tl { top:-3px; left:-3px;   border-width: 3px 0 0 3px; border-radius: 4px 0 0 0; }
+.qr-corner.tr { top:-3px; right:-3px;  border-width: 3px 3px 0 0; border-radius: 0 4px 0 0; }
+.qr-corner.bl { bottom:-3px; left:-3px;  border-width: 0 0 3px 3px; border-radius: 0 0 0 4px; }
+.qr-corner.br { bottom:-3px; right:-3px; border-width: 0 3px 3px 0; border-radius: 0 0 4px 0; }
+
+#qr-canvas {
+    display: block;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+}
+
+/* QR yüklenirken placeholder */
+.qr-placeholder {
+    width: 220px; height: 220px;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 12px;
+    color: var(--bg-surface);
+    font-size: 0.8rem;
+}
+.qr-placeholder .pl-spinner {
+    width: 32px; height: 32px;
+    border: 3px solid var(--bg-surface);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+/* Zamanlayıcı */
+.timer-section {
+    width: min(300px, 100%);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: center;
+}
+
+.timer-label { font-size: 0.88rem; color: var(--text-mid); text-align: center; }
+.timer-label strong { color: var(--accent); font-variant-numeric: tabular-nums; font-size: 1rem; }
+
+.progress-track {
+    width: 100%;
+    height: 5px;
+    background: var(--bg-surface);
+    border-radius: 3px;
+    overflow: hidden;
+}
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-dim), var(--accent));
+    border-radius: 3px;
+    transition: width 1s linear;
+    will-change: width;
+}
+
+/* Bilgi şeridi */
+.info-strip {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 14px 24px;
+    width: min(300px, 100%);
+}
+.info-item { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 1; }
+.info-label { font-size: 0.7rem; font-weight: 700; color: var(--text-lo); letter-spacing: 0.1em; text-transform: uppercase; }
+.info-value { font-size: 1rem; font-weight: 600; font-family: 'Courier New', monospace; letter-spacing: 0.12em; }
+.info-divider { width: 1px; height: 36px; background: var(--border); }
+
+.badge { font-size: 0.78rem; font-weight: 700; padding: 3px 10px; border-radius: 20px; }
+.badge-ok      { background: rgba(74,222,128,0.15); color: var(--success); }
+.badge-warning { background: rgba(251,191,36,0.15); color: #fbbf24; }
+.badge-error   { background: rgba(248,113,113,0.15); color: var(--danger); }
+
+.offline-bar {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: rgba(251,191,36,0.12);
+    border-top: 1px solid rgba(251,191,36,0.3);
+    color: #fbbf24;
+    font-size: 0.78rem;
+    text-align: center;
+    padding: 8px;
+}
+
+/* ── Toast bildirimi ──────────────────── */
+.toast {
+    position: fixed;
+    bottom: 24px; left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    color: var(--text-hi);
+    padding: 12px 20px;
+    border-radius: 40px;
+    font-size: 0.88rem;
+    font-weight: 500;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    transition: transform 0.3s cubic-bezier(.34,1.56,.64,1);
+    z-index: 100;
+    white-space: nowrap;
+}
+.toast.show { transform: translateX(-50%) translateY(0); }
+.toast.success { border-color: rgba(74,222,128,0.4); color: var(--success); }
+.toast.error   { border-color: rgba(248,113,113,0.4); color: var(--danger); }
+
+@media (max-width: 380px) {
+    #qr-canvas { width: 180px !important; height: 180px !important; }
+    .login-card { padding: 24px 18px; }
+}
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+    </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════ -->
+<!--  EKRAN 1: Giriş / Kayıt                    -->
+<!-- ═══════════════════════════════════════════ -->
+<div id="screen-login" class="screen active">
+    <div class="login-card">
+        <div class="logo">🔐</div>
+        <h1>QR Geçiş</h1>
+        <p class="subtitle">Cihazınızı bir kez kaydedin</p>
+
+        <div class="form-group">
+            <label for="inp-name">Ad Soyad</label>
+            <input type="text" id="inp-name" placeholder="Adınızı girin" autocomplete="name">
+        </div>
+        <div class="form-group">
+            <label for="inp-email">E-posta</label>
+            <input type="email" id="inp-email" placeholder="ornek@firma.com" autocomplete="email">
+        </div>
+        <div class="form-group">
+            <label for="inp-server">Sunucu Adresi</label>
+            <input type="url" id="inp-server" placeholder="http://192.168.1.100:3000" value="http://localhost:3000">
+        </div>
+
+        <button id="btn-register" class="btn-primary">
+            <span class="spinner"></span>
+            <span class="btn-text">Cihazı Kaydet</span>
+        </button>
+
+        <p id="login-error" class="error-msg hidden"></p>
+        <p class="hint">İlk kayıt için internet bağlantısı gereklidir.</p>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!--  EKRAN 2: QR Görüntüleyici                 -->
+<!-- ═══════════════════════════════════════════ -->
+<div id="screen-qr" class="screen">
+    <header class="app-header">
+        <span id="hdr-username">—</span>
+        <button id="btn-logout" class="btn-logout">Çıkış</button>
+    </header>
+
+    <main class="qr-main">
+        <!-- QR Kod -->
+        <div class="qr-wrapper">
+            <div id="qr-area">
+                <!-- Canvas buraya dinamik eklenir -->
+                <div class="qr-placeholder" id="qr-placeholder">
+                    <div class="pl-spinner"></div>
+                    <span>Üretiliyor…</span>
+                </div>
+            </div>
+            <div class="qr-corner tl"></div>
+            <div class="qr-corner tr"></div>
+            <div class="qr-corner bl"></div>
+            <div class="qr-corner br"></div>
+        </div>
+
+        <!-- Zamanlayıcı -->
+        <div class="timer-section">
+            <p class="timer-label">Yeni kod üretiliyor… <strong id="countdown">30</strong> sn</p>
+            <div class="progress-track">
+                <div id="progress-fill" class="progress-fill" style="width:100%"></div>
+            </div>
+        </div>
+
+        <!-- Bilgi şeridi -->
+        <div class="info-strip">
+            <div class="info-item">
+                <span class="info-label">Kod</span>
+                <span id="current-code" class="info-value">––––––</span>
+            </div>
+            <div class="info-divider"></div>
+            <div class="info-item">
+                <span class="info-label">Durum</span>
+                <span id="status-badge" class="badge badge-ok">Hazır</span>
+            </div>
+        </div>
+    </main>
+
+    <div id="offline-bar" class="offline-bar hidden">● Çevrimdışı mod — QR kodlar internet olmadan çalışır</div>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="toast"></div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!--  JAVASCRIPT (tek blok, hiç dış bağımlılık) -->
+<!-- ═══════════════════════════════════════════ -->
+<script>
+'use strict';
+
+/* ─────────────────────────────────────────────
+   1. STORAGE
+───────────────────────────────────────────── */
+const Store = {
+    KEYS: { UID:'qr_uid', UNAME:'qr_uname', SEED:'qr_seed', SRV:'qr_srv' },
+    save(o) {
+        try {
+            localStorage.setItem(this.KEYS.UID,   String(o.userId));
+            localStorage.setItem(this.KEYS.UNAME, o.userName);
+            localStorage.setItem(this.KEYS.SEED,  o.secretSeed);
+            localStorage.setItem(this.KEYS.SRV,   o.serverUrl);
+        } catch(e) { console.error('[Store]', e); }
+    },
+    load() {
+        try {
+            return {
+                userId:     localStorage.getItem(this.KEYS.UID),
+                userName:   localStorage.getItem(this.KEYS.UNAME),
+                secretSeed: localStorage.getItem(this.KEYS.SEED),
+                serverUrl:  localStorage.getItem(this.KEYS.SRV),
+            };
+        } catch(e) { return {}; }
+    },
+    clear() { Object.values(this.KEYS).forEach(k => localStorage.removeItem(k)); },
+    isReady() { const {userId,secretSeed} = this.load(); return !!(userId && secretSeed); }
+};
+
+/* ─────────────────────────────────────────────
+   2. TOTP  (RFC 6238 — Web Crypto API, pure JS)
+   Dışa bağımlılık yok, offline çalışır
+───────────────────────────────────────────── */
+const TOTP = {
+    _b32chars: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567',
+
+    base32Decode(s) {
+        const clean = s.toUpperCase().replace(/=+$/, '').replace(/\s/g, '');
+        let bits = 0, val = 0;
+        const out = [];
+        for (let i = 0; i < clean.length; i++) {
+            const idx = this._b32chars.indexOf(clean[i]);
+            if (idx < 0) continue;
+            val = (val << 5) | idx;
+            bits += 5;
+            if (bits >= 8) { bits -= 8; out.push((val >>> bits) & 0xFF); }
+        }
+        return new Uint8Array(out);
+    },
+
+    async hmacSha1(keyBytes, msgBytes) {
+        const key = await crypto.subtle.importKey(
+            'raw', keyBytes,
+            { name: 'HMAC', hash: 'SHA-1' },
+            false, ['sign']
+        );
+        return new Uint8Array(await crypto.subtle.sign('HMAC', key, msgBytes));
+    },
+
+    async generate(secret, step = 30) {
+        const keyBytes = this.base32Decode(secret);
+        const T = Math.floor(Date.now() / 1000 / step);
+
+        // Counter: Big-Endian 8 byte
+        const counter = new Uint8Array(8);
+        let tmp = T;
+        for (let i = 7; i >= 0; i--) { counter[i] = tmp & 0xFF; tmp = Math.floor(tmp / 256); }
+
+        const hmac  = await this.hmacSha1(keyBytes, counter);
+        const offset = hmac[19] & 0x0F;
+        const code  = (
+            ((hmac[offset]   & 0x7F) << 24) |
+            ((hmac[offset+1] & 0xFF) << 16) |
+            ((hmac[offset+2] & 0xFF) << 8)  |
+             (hmac[offset+3] & 0xFF)
+        ) % 1_000_000;
+
+        return String(code).padStart(6, '0');
+    }
+};
+
+/* ─────────────────────────────────────────────
+   3. QR KOD ÜRETİCİ (pure canvas, hiç kütüphane yok)
+   Mikro QR matris algoritması — standart QR Mode: Byte
+───────────────────────────────────────────── */
+const QRCanvas = (() => {
+
+    // ── Galois Field GF(256) aritmetiği ──────────
+    const EXP = new Uint8Array(512);
+    const LOG = new Uint8Array(256);
+    (function () {
+        let x = 1;
+        for (let i = 0; i < 255; i++) {
+            EXP[i] = x; LOG[x] = i;
+            x <<= 1; if (x > 255) x ^= 0x11D;
+        }
+        for (let i = 255; i < 512; i++) EXP[i] = EXP[i - 255];
+    })();
+
+    function mul(a, b) { return a && b ? EXP[LOG[a] + LOG[b]] : 0; }
+
+    function polyMul(a, b) {
+        const r = new Uint8Array(a.length + b.length - 1);
+        for (let i = 0; i < a.length; i++)
+            for (let j = 0; j < b.length; j++)
+                r[i + j] ^= mul(a[i], b[j]);
+        return r;
+    }
+
+    function rsGen(n) {
+        let g = new Uint8Array([1]);
+        for (let i = 0; i < n; i++) g = polyMul(g, new Uint8Array([1, EXP[i]]));
+        return g;
+    }
+
+    function rsDivide(data, n) {
+        const gen = rsGen(n);
+        const msg = new Uint8Array(data.length + n);
+        msg.set(data);
+        for (let i = 0; i < data.length; i++) {
+            const c = msg[i];
+            if (!c) continue;
+            for (let j = 0; j < gen.length; j++) msg[i + j] ^= mul(gen[j], c);
+        }
+        return msg.slice(data.length);
+    }
+
+    // ── QR versiyon tablosu (versiyon 1-10, ECC L) ──
+    // [versiyon, boyut, veri_kapasitesi_byte, ec_codewords, bloklar]
+    const VER = [
+        null,
+        [1, 21,  7, 10, 1],
+        [2, 25, 11, 16, 1],
+        [3, 29, 15, 26, 1],  // <-- normal ~12 char için
+        [4, 33, 20, 18, 2],
+        [5, 37, 26, 24, 2],
+        [6, 41, 36, 16, 4],
+        [7, 45, 44, 18, 4],
+        [8, 49, 48, 22, 4],
+        [9, 53, 60, 22, 5],
+        [10,57, 68, 26, 5],
+    ];
+
+    // Hizalama pattern pozisyonları (versiyon 2+)
+    const ALIGN_POS = [
+        [], [], [6,18], [6,22], [6,26], [6,30], [6,34],
+        [6,22,38], [6,24,42], [6,26,46], [6,28,50]
+    ];
+
+    function selectVersion(byteLen) {
+        for (let v = 1; v <= 10; v++) {
+            if (VER[v] && byteLen <= VER[v][2]) return v;
+        }
+        return 10; // fazla uzunsa 10'da kes
+    }
+
+    function buildMatrix(data, version) {
+        const [, size, , ecCount] = VER[version];
+        const mat = Array.from({length: size}, () => new Int8Array(size).fill(-1));
+
+        // Finder pattern
+        function finder(r, c) {
+            for (let dr = 0; dr < 7; dr++)
+                for (let dc = 0; dc < 7; dc++) {
+                    const v = (dr === 0 || dr === 6 || dc === 0 || dc === 6)
+                        ? 1 : (dr >= 2 && dr <= 4 && dc >= 2 && dc <= 4 ? 1 : 0);
+                    if (r+dr < size && c+dc < size) mat[r+dr][c+dc] = v;
+                }
+        }
+        finder(0, 0); finder(0, size-7); finder(size-7, 0);
+
+        // Separator
+        for (let i = 0; i < 8; i++) {
+            const s = size - 8;
+            if (i < size) {
+                mat[7][i] = 0; mat[i][7] = 0;
+                mat[7][s+i] = 0;
+                mat[s+i] = mat[s+i] || new Int8Array(size).fill(-1);
+                mat[s][i] = 0; mat[i][s] = 0;
+                if (s+i < size) { mat[s+i][s] = 0; mat[s][s+i] = 0; }
+            }
+        }
+
+        // Timing
+        for (let i = 8; i < size - 8; i++) {
+            mat[6][i] = i % 2 === 0 ? 1 : 0;
+            mat[i][6] = i % 2 === 0 ? 1 : 0;
+        }
+
+        // Dark module
+        mat[size-8][8] = 1;
+
+        // Alignment (versiyon 2+)
+        if (version >= 2) {
+            const ap = ALIGN_POS[version];
+            for (const r of ap) for (const c of ap) {
+                if (mat[r][c] !== -1) continue;
+                for (let dr = -2; dr <= 2; dr++)
+                    for (let dc = -2; dc <= 2; dc++) {
+                        const v = (Math.abs(dr) === 2 || Math.abs(dc) === 2) ? 1
+                            : (dr === 0 && dc === 0 ? 1 : 0);
+                        mat[r+dr][c+dc] = v;
+                    }
+            }
+        }
+
+        // Format info (ECC L, maske 0)
+        const fmtBits = [1,1,1,0,1,1,1,1,1,0,0,0,1,0,0]; // precomputed ECC-L maske-0
+        const fmtPos  = [0,1,2,3,4,5,7,8]; // format bit konumları (8 bit sol + vertikal)
+        for (let i = 0; i < 6; i++) {
+            mat[8][i] = fmtBits[i];
+            mat[i][8] = fmtBits[i];
+        }
+        mat[8][7] = fmtBits[6]; mat[7][8] = fmtBits[6]; mat[8][8] = fmtBits[7];
+        for (let i = 0; i < 7; i++) {
+            mat[size-1-i][8] = fmtBits[i];
+            mat[8][size-1-i] = fmtBits[i+7];
+        }
+
+        return mat;
+    }
+
+    function encodeData(text, version) {
+        const [, , dataCap, ecCount] = VER[version];
+        const bytes  = new TextEncoder().encode(text);
+        const bits   = [];
+
+        // Mode: Byte (0100)
+        bits.push(0,1,0,0);
+        // Karakter sayısı: 8 bit
+        const len = Math.min(bytes.length, dataCap - 3);
+        for (let i = 7; i >= 0; i--) bits.push((len >> i) & 1);
+        // Veri
+        for (let i = 0; i < len; i++)
+            for (let b = 7; b >= 0; b--) bits.push((bytes[i] >> b) & 1);
+        // Terminator
+        for (let i = 0; i < Math.min(4, dataCap * 8 - bits.length); i++) bits.push(0);
+        // Pad to byte boundary
+        while (bits.length % 8) bits.push(0);
+        // Pad codewords
+        const padWords = [0xEC, 0x11];
+        let pi = 0;
+        while (bits.length < dataCap * 8) {
+            const pw = padWords[pi++ % 2];
+            for (let b = 7; b >= 0; b--) bits.push((pw >> b) & 1);
+        }
+
+        // Bits → bytes
+        const data = new Uint8Array(dataCap);
+        for (let i = 0; i < dataCap; i++) {
+            let v = 0;
+            for (let b = 0; b < 8; b++) v = (v << 1) | (bits[i*8+b] || 0);
+            data[i] = v;
+        }
+
+        // Reed-Solomon
+        const ec = rsDivide(data, ecCount);
+
+        // Merge
+        const all = new Uint8Array(dataCap + ecCount);
+        all.set(data); all.set(ec, dataCap);
+        return all;
+    }
+
+    function placeData(mat, codewords) {
+        const size = mat.length;
+        let bit = 0;
+
+        // Sağdan sola çift sütun çiftleri halinde yerleştir
+        let col = size - 1;
+        let goingUp = true;
+
+        while (col >= 0) {
+            if (col === 6) { col--; continue; } // timing sütununu atla
+
+            for (let i = 0; i < size; i++) {
+                const row = goingUp ? size - 1 - i : i;
+                for (let dc = 0; dc < 2; dc++) {
+                    const c = col - dc;
+                    if (mat[row][c] !== -1) continue;
+                    const byteIdx = Math.floor(bit / 8);
+                    const bitIdx  = 7 - (bit % 8);
+                    const val = byteIdx < codewords.length
+                        ? (codewords[byteIdx] >> bitIdx) & 1
+                        : 0;
+                    // Maske 0: (row + col) % 2 === 0
+                    mat[row][c] = val ^ ((row + c) % 2 === 0 ? 1 : 0);
+                    bit++;
+                }
+            }
+            goingUp = !goingUp;
+            col -= 2;
+        }
+    }
+
+    /**
+     * QR kodu canvas'a çizer.
+     * @param {string} text     - QR içeriği
+     * @param {HTMLCanvasElement} canvas
+     * @param {number} [px=4]   - Modül piksel boyutu
+     */
+    function draw(text, canvas, px = 4) {
+        const version = selectVersion(new TextEncoder().encode(text).length);
+        const [, size] = VER[version];
+        const mat = buildMatrix(text, version);
+        const cw  = encodeData(text, version);
+        placeData(mat, cw);
+
+        const margin = px * 4;
+        const total  = size * px + margin * 2;
+        canvas.width  = total;
+        canvas.height = total;
+
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, total, total);
+        ctx.fillStyle = '#000000';
+
+        for (let r = 0; r < size; r++)
+            for (let c = 0; c < size; c++)
+                if (mat[r][c] === 1)
+                    ctx.fillRect(margin + c * px, margin + r * px, px, px);
+    }
+
+    return { draw };
+})();
+
+/* ─────────────────────────────────────────────
+   4. UI YARDIMCILARI
+───────────────────────────────────────────── */
+function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+}
+
+let toastTimer = null;
+function toast(msg, type = '') {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = 'toast show' + (type ? ' ' + type : '');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+function updateOffline() {
+    document.getElementById('offline-bar').classList.toggle('hidden', navigator.onLine);
+}
+
+/* ─────────────────────────────────────────────
+   5. QR DÖNGÜSÜ
+───────────────────────────────────────────── */
+const STEP_MS = 30_000;
+let tickTimer    = null;
+let _userId      = null;
+let _secretSeed  = null;
+let _canvas      = null;
+
+async function genQR() {
+    if (!_secretSeed || !_userId) return;
+
+    try {
+        const code    = await TOTP.generate(_secretSeed, 30);
+        const payload = `${_userId}:${code}`;
+
+        // Canvas ilk seferinde oluştur
+        if (!_canvas) {
+            _canvas = document.createElement('canvas');
+            _canvas.id = 'qr-canvas';
+            const area = document.getElementById('qr-area');
+            area.innerHTML = '';
+            area.appendChild(_canvas);
+        }
+
+        QRCanvas.draw(payload, _canvas, 4);
+
+        document.getElementById('current-code').textContent = code;
+        const badge = document.getElementById('status-badge');
+        badge.textContent = 'Hazır';
+        badge.className   = 'badge badge-ok';
+
+    } catch(err) {
+        console.error('[QR] Hata:', err);
+        const badge = document.getElementById('status-badge');
+        badge.textContent = 'Hata';
+        badge.className   = 'badge badge-error';
+    }
+}
+
+function startTick() {
+    clearInterval(tickTimer);
+    genQR();
+
+    tickTimer = setInterval(() => {
+        const now      = Date.now();
+        const elapsed  = now % STEP_MS;
+        const remaining = Math.ceil((STEP_MS - elapsed) / 1000);
+        const fillPct  = ((STEP_MS - elapsed) / STEP_MS) * 100;
+
+        document.getElementById('countdown').textContent = remaining;
+        document.getElementById('progress-fill').style.width = fillPct + '%';
+
+        if (remaining === 30) genQR(); // yeni pencere başladığında kod üret
+    }, 1000);
+}
+
+function stopTick() { clearInterval(tickTimer); tickTimer = null; }
+
+/* ─────────────────────────────────────────────
+   6. KAYIT (register-device)
+───────────────────────────────────────────── */
+async function handleRegister() {
+    const name      = document.getElementById('inp-name').value.trim();
+    const email     = document.getElementById('inp-email').value.trim();
+    const serverUrl = document.getElementById('inp-server').value.trim().replace(/\/+$/, '');
+    const errEl     = document.getElementById('login-error');
+    const btn       = document.getElementById('btn-register');
+
+    errEl.classList.add('hidden');
+
+    if (!name || !email || !serverUrl) {
+        errEl.textContent = 'Tüm alanları doldurun.';
+        errEl.classList.remove('hidden');
+        return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        errEl.textContent = 'Geçerli bir e-posta adresi girin.';
+        errEl.classList.remove('hidden');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.classList.add('loading');
+
+    try {
+        const res  = await fetch(`${serverUrl}/api/auth/register-device`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, email }),
+        });
+
+        const data = await res.json();
+
+        if (!res.ok || data.status !== 'success') {
+            throw new Error(data.message || `HTTP ${res.status}`);
+        }
+
+        Store.save({
+            userId:     data.data.userId,
+            userName:   data.data.name || name,
+            secretSeed: data.data.secretSeed,
+            serverUrl,
+        });
+
+        toast('Kayıt başarılı!', 'success');
+        initQR({ userId: data.data.userId, userName: data.data.name || name, secretSeed: data.data.secretSeed });
+
+    } catch (err) {
+        console.error('[KAYIT]', err);
+        errEl.textContent = `Bağlantı hatası: ${err.message}. Sunucu adresini ve backend'in çalıştığını kontrol edin.`;
+        errEl.classList.remove('hidden');
+    } finally {
+        btn.disabled = false;
+        btn.classList.remove('loading');
+    }
+}
+
+/* ─────────────────────────────────────────────
+   7. QR EKRАНИ BAŞLAT
+───────────────────────────────────────────── */
+function initQR({ userId, userName, secretSeed }) {
+    _userId     = userId;
+    _secretSeed = secretSeed;
+    _canvas     = null; // yeni ekranda sıfırla
+
+    document.getElementById('hdr-username').textContent = userName || 'Kullanıcı';
+    showScreen('screen-qr');
+    updateOffline();
+    startTick();
+}
+
+/* ─────────────────────────────────────────────
+   8. ÇIKIŞ
+───────────────────────────────────────────── */
+function handleLogout() {
+    if (!confirm('Cihaz kaydı silinecek ve yeniden kayıt gerekecek.\nDevam etmek istiyor musunuz?')) return;
+    stopTick();
+    Store.clear();
+    _userId = null; _secretSeed = null; _canvas = null;
+    document.getElementById('qr-area').innerHTML =
+        '<div class="qr-placeholder" id="qr-placeholder"><div class="pl-spinner"></div><span>Üretiliyor…</span></div>';
+    showScreen('screen-login');
+}
+
+/* ─────────────────────────────────────────────
+   9. INIT
+───────────────────────────────────────────── */
+(function init() {
+    // Olay dinleyicileri
+    document.getElementById('btn-register').addEventListener('click', handleRegister);
+    document.getElementById('btn-logout').addEventListener('click', handleLogout);
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && document.getElementById('screen-login').classList.contains('active'))
+            handleRegister();
+    });
+    window.addEventListener('online',  updateOffline);
+    window.addEventListener('offline', updateOffline);
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && _secretSeed) genQR();
+    });
+
+    // Kayıtlı oturum?
+    if (Store.isReady()) {
+        const { userId, userName, secretSeed } = Store.load();
+        initQR({ userId, userName, secretSeed });
+    } else {
+        showScreen('screen-login');
+    }
+})();
+</script>
+</body>
+</html>

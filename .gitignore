@@ -1,0 +1,12 @@
+# Bağımlılıklar
+node_modules/
+
+# Gizli yapılandırma
+backend/.env
+
+# Kendi kendine imzalı PWA sertifikaları
+frontend/certs/
+*.pem
+
+# Loglar
+*.log

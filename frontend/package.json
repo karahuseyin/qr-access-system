@@ -1,0 +1,14 @@
+{
+  "name": "qr-access-pwa-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "QR Geçiş Sistemi — PWA statik sunucu (HTTP + HTTPS)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "icons": "node tools/make-icons.js"
+  },
+  "dependencies": {
+    "selfsigned": "^2.4.1"
+  }
+}

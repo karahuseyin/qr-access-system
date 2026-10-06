@@ -1,0 +1,20 @@
+# Sunucu
+PORT=3000
+NODE_ENV=development
+
+# SQL Server Bağlantısı
+DB_SERVER=localhost
+DB_PORT=1433
+DB_DATABASE=QRAccessControl
+DB_USER=sa
+DB_PASSWORD=YourStrong@Passw0rd
+DB_ENCRYPT=false
+DB_TRUST_SERVER_CERT=true
+
+# TOTP Ayarları
+TOTP_WINDOW=1       # ±1 pencere = ±30 saniye tolerans
+TOTP_STEP=30        # 30 saniyelik pencere
+
+# Güvenlik
+RATE_LIMIT_WINDOW_MS=60000
+RATE_LIMIT_MAX=100
